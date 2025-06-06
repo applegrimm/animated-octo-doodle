@@ -1,0 +1,309 @@
+/* =============================
+  Non-Critical CSS（遅延読み込み用）
+  アニメーション、高度な装飾、ホバー効果など
+============================= */
+
+/* 高度なアニメーションとトランジション */
+button:hover:not(:disabled) {
+  background: #27ae60;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.normal-reservation-btn:hover:not(:disabled) {
+  background: #27ae60;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.payment-reservation-btn:hover:not(:disabled) {
+  background: #8e44ad;
+  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+}
+
+.add-product-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.remove-product-btn:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+/* モーダルアニメーション */
+#custom-modal {
+  animation: modalFadeIn 0.3s ease-in-out;
+}
+
+#custom-modal > div {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from { transform: translateY(-50px) scale(0.9); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* 商品説明の高度なスタイル */
+.product-desc {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 4px;
+  border-left: 3px solid #3498db;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.product-desc:not(:empty) {
+  margin-top: 8px;
+  opacity: 1;
+  max-height: 100px;
+}
+
+.product-desc:empty {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  padding: 0;
+}
+
+/* 高度なフォーカス・バリデーションアニメーション */
+input:focus, select:focus, textarea:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  outline: none;
+  transition: all 0.3s ease;
+  transform: scale(1.01);
+}
+
+input:invalid:not(:placeholder-shown):not(:focus), 
+select:invalid:not(:focus), 
+textarea:invalid:not(:placeholder-shown):not(:focus) {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* 警告・通知の高度なアニメーション */
+.rate-limit-warning {
+  animation: slideInWarning 0.4s ease-out;
+}
+
+@keyframes slideInWarning {
+  from { 
+    transform: translateY(-20px); 
+    opacity: 0;
+    max-height: 0;
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1;
+    max-height: 200px;
+  }
+}
+
+/* セキュリティ通知の脈動アニメーション */
+.security-notice {
+  animation: pulse 3s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* 合計金額の高度なスタイル */
+.total-amount-display {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.total-amount-display:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.total-amount {
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: amountGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes amountGlow {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.1); }
+}
+
+/* テストモード表示 */
+.test-mode-indicator {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #f39c12;
+  animation: testModeFlash 2s infinite;
+  font-weight: bold;
+}
+
+@keyframes testModeFlash {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+/* ローディング状態の高度なアニメーション */
+.loading::after {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* プライバシーポリシーの高度なアニメーション */
+.privacy-content {
+  transition: all 0.3s ease-in-out;
+  transform-origin: top;
+}
+
+.privacy-content.show {
+  animation: expandDown 0.3s ease-out;
+}
+
+@keyframes expandDown {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+    max-height: 300px;
+  }
+}
+
+.privacy-toggle {
+  transition: all 0.2s ease;
+}
+
+.privacy-toggle:hover {
+  color: #2980b9;
+  transform: scale(1.05);
+}
+
+/* チェックボックスの高度なスタイル */
+.consent-checkbox input[type="checkbox"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #3498db;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.consent-checkbox input[type="checkbox"]:checked {
+  background: #3498db;
+  border-color: #3498db;
+  animation: checkPop 0.3s ease;
+}
+
+.consent-checkbox input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: -2px;
+  left: 2px;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+@keyframes checkPop {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* 最終メッセージの高度なアニメーション */
+#final-message {
+  background: linear-gradient(135deg, #e8f5e8 0%, #c3e6c3 100%);
+  border: 2px solid #27ae60;
+  border-radius: 8px;
+  padding: 24px;
+  animation: finalMessageAppear 0.5s ease-out;
+  box-shadow: 0 4px 16px rgba(39, 174, 96, 0.2);
+}
+
+@keyframes finalMessageAppear {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 商品アイテムのホバー効果 */
+.product-item {
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 8px;
+  margin: 8px 0;
+}
+
+.product-item:hover {
+  background: #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transform: translateX(4px);
+}
+
+/* モバイル向けの高度な調整 */
+@media (max-width: 600px) {
+  .total-amount {
+    animation-duration: 3s;
+  }
+  
+  button:hover:not(:disabled) {
+    transform: none; /* モバイルではホバー効果を無効化 */
+  }
+  
+  input:focus, select:focus, textarea:focus {
+    transform: none; /* モバイルではスケール効果を無効化 */
+  }
+  
+  .product-item:hover {
+    transform: none; /* モバイルではホバー効果を無効化 */
+    box-shadow: none;
+    background: none;
+  }
+} 

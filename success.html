@@ -1,0 +1,577 @@
+<!--
+  @file success.html
+  @brief Stripe決済完了ページ
+  @details 決済完了後に予約情報をGASに送信し、メール通知を実行
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- セキュリティ強化メタタグ -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <!-- HTTPS リダイレクト強制 -->
+  <script>
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      location.replace('https:' + window.location.href.substring(window.location.protocol.length));
+    }
+  </script>
+  <title>決済完了 - テイクアウト予約フォーム</title>
+  
+  <style>
+  /* =============================
+    レスポンシブデザイン用CSS
+  ============================= */
+  * {
+    box-sizing: border-box !important;
+  }
+  html {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  body {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: 'Segoe UI', 'Meiryo', sans-serif;
+    background: #f7f7f7;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden !important;
+  }
+  
+  .container {
+    max-width: 480px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 32px 24px;
+    text-align: center;
+  }
+  
+  .success-icon {
+    font-size: 4em;
+    color: #27ae60;
+    margin-bottom: 16px;
+  }
+  
+  h1 {
+    color: #27ae60;
+    font-size: 1.8em;
+    margin-bottom: 24px;
+  }
+  
+  .payment-info {
+    background: #e8f5e8;
+    border: 1px solid #c3e6c3;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 24px 0;
+    text-align: left;
+  }
+  
+  .payment-info h3 {
+    margin-top: 0;
+    color: #2d5016;
+    font-size: 1.1em;
+  }
+  
+  .payment-info p {
+    margin: 8px 0;
+    color: #2d5016;
+    font-size: 0.9em;
+  }
+  
+  .processing-message {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 24px 0;
+    color: #856404;
+  }
+  
+  .error-message {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 24px 0;
+    color: #721c24;
+  }
+  
+  .loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .action-buttons {
+    margin-top: 32px;
+  }
+  
+  .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    margin: 8px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .btn-primary {
+    background: #3498db;
+    color: #fff;
+  }
+  
+  .btn-primary:hover {
+    background: #2980b9;
+  }
+  
+  .btn-secondary {
+    background: #95a5a6;
+    color: #fff;
+  }
+  
+  .btn-secondary:hover {
+    background: #7f8c8d;
+  }
+  
+  @media (max-width: 600px) {
+    .container {
+      margin: 20px auto;
+      padding: 24px 16px;
+      border-radius: 0;
+      min-height: calc(100vh - 40px);
+    }
+    
+    h1 {
+      font-size: 1.5em;
+    }
+    
+    .btn {
+      display: block;
+      width: 100%;
+      margin: 8px 0;
+    }
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="success-icon">✅</div>
+    <h1>決済完了</h1>
+    
+    <div id="processing-status" class="processing-message">
+      <div class="loading-spinner"></div>
+      予約情報を処理しています...
+    </div>
+    
+    <div id="payment-details" class="payment-info" style="display: none;">
+      <h3>決済情報</h3>
+      <p><strong>決済ID:</strong> <span id="session-id" style="font-family: monospace; word-break: break-all; font-size: 0.9em;">-</span></p>
+      <p><strong>決済金額:</strong> <span id="payment-amount">-</span></p>
+      <p><strong>決済日時:</strong> <span id="payment-date">-</span></p>
+    </div>
+    
+    <div id="reservation-details" class="payment-info" style="display: none;">
+      <h3>予約情報</h3>
+      <p><strong>お名前:</strong> <span id="customer-name">-</span></p>
+      <p><strong>受取店舗:</strong> <span id="pickup-store">-</span></p>
+      <p><strong>受取日時:</strong> <span id="pickup-datetime">-</span></p>
+      <p><strong>ご注文内容:</strong></p>
+      <div id="order-items">-</div>
+    </div>
+    
+    <div id="success-message" style="display: none;">
+      <p style="color: #27ae60; font-size: 1.1em; margin: 16px 0;">
+        ✅ 予約が正常に完了しました！<br>
+        確認メールをお送りしましたので、ご確認ください。
+      </p>
+    </div>
+    
+    <div id="close-instruction" style="display: none; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 16px; margin: 24px 0; font-size: 0.9em; color: #495057;">
+      <h4 style="margin: 0 0 12px 0; color: #495057; font-size: 1em;">📋 ご案内</h4>
+      <p style="margin: 0 0 16px 0; color: #495057; font-weight: bold; font-size: 1em;">
+        予約処理が完了しました。この画面を閉じてください。
+      </p>
+      <div style="text-align: left;">
+        <p style="margin: 8px 0; font-weight: bold; color: #6c757d;">📱 スマートフォンの場合：</p>
+        <ul style="margin: 4px 0 12px 20px; padding: 0;">
+          <li>ブラウザのタブ一覧から該当タブを閉じる</li>
+          <li>ブラウザアプリを終了する</li>
+        </ul>
+        <p style="margin: 8px 0; font-weight: bold; color: #6c757d;">💻 パソコンの場合：</p>
+        <ul style="margin: 4px 0 8px 20px; padding: 0;">
+          <li>ブラウザのタブの「×」ボタンをクリック</li>
+          <li>キーボードの「Ctrl + W」（Windows）または「Cmd + W」（Mac）</li>
+          <li>ブラウザウィンドウの「×」ボタンをクリック</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div id="error-details" class="error-content" style="display: none;">
+      <div class="error-icon">❌</div>
+      <h2>エラーが発生しました</h2>
+      <p id="error-message-detail">予約の処理中にエラーが発生しました。</p>
+      <p>
+        決済ID <span id="error-session-id" style="font-family: monospace; word-break: break-all; font-size: 0.9em;">-</span> を控えて、
+        お手数ですが店舗までお問い合わせください。
+      </p>
+      <p style="color: #666; font-size: 0.9em;">
+        ※決済は完了していますので、重複して決済を行わないでください。
+      </p>
+    </div>
+    
+    <div class="action-buttons" id="action-buttons" style="display: none;">
+      <a href="index.html" class="btn btn-primary">新しい予約をする</a>
+    </div>
+  </div>
+
+  <script>
+    // GASのWebアプリURL（index.htmlと同じURL）
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwgeG189yH0YGt6gpqpYHoclCnZe4cbo8jARRaHCqjgxpiD_XW47taPqNFlQYDhfaYaCg/exec';
+    
+    // URLパラメータから決済情報を取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    
+    console.log('決済完了ページ読み込み:', { sessionId });
+    
+    // ページ読み込み時に処理開始
+    window.addEventListener('DOMContentLoaded', async function() {
+      if (!sessionId) {
+        showError('決済セッションIDが取得できませんでした。');
+        return;
+      }
+      
+      try {
+        // session_idを使ってGASから決済・予約情報を取得
+        const paymentInfo = await getPaymentInfoFromGas(sessionId);
+        
+        if (!paymentInfo || !paymentInfo.success) {
+          throw new Error(paymentInfo ? paymentInfo.error : '決済情報の取得に失敗しました');
+        }
+        
+        console.log('決済情報取得:', paymentInfo);
+        
+        // 決済情報を表示
+        displayPaymentInfo(sessionId, paymentInfo.data);
+        
+        // 予約情報を表示
+        displayReservationInfo(paymentInfo.data);
+        
+        // GASに予約情報を送信
+        await submitReservationToGas(sessionId, paymentInfo.data);
+        
+      } catch (error) {
+        console.error('予約処理エラー:', error);
+        showError('予約データの処理中にエラーが発生しました: ' + error.message);
+      }
+    });
+    
+    /**
+     * GASから決済情報を取得
+     */
+    async function getPaymentInfoFromGas(sessionId) {
+      try {
+        console.log('GASから決済情報取得開始:', sessionId);
+        
+        // JSONP方式でGASから情報を取得
+        const result = await fetchFromGasViaJsonp('getPaymentInfo', { sessionId });
+        
+        console.log('決済情報取得結果:', result);
+        return result;
+        
+      } catch (error) {
+        console.error('決済情報取得エラー:', error);
+        return { success: false, error: error.message };
+      }
+    }
+    
+    /**
+     * 汎用JSONP方式でGASにリクエスト送信
+     */
+    async function fetchFromGasViaJsonp(action, data) {
+      return new Promise((resolve, reject) => {
+        try {
+          const callbackName = 'gasCallback' + Date.now();
+          
+          // グローバルコールバック関数を定義
+          window[callbackName] = function(result) {
+            console.log('GAS応答受信:', result);
+            
+            try {
+              if (typeof result === 'string') {
+                result = JSON.parse(result);
+              }
+              resolve(result);
+            } catch (error) {
+              reject(new Error('応答の解析に失敗しました'));
+            } finally {
+              cleanup();
+            }
+          };
+          
+          // クリーンアップ関数
+          const cleanup = () => {
+            const script = document.querySelector(`script[data-callback="${callbackName}"]`);
+            if (script && script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
+            if (window[callbackName]) {
+              delete window[callbackName];
+            }
+          };
+          
+          // データをエンコード
+          const jsonString = JSON.stringify(data);
+          const encodedData = btoa(encodeURIComponent(jsonString));
+          
+          // JSONPリクエストURL作成
+          const jsonpUrl = `${GAS_WEB_APP_URL}?action=${action}&data=${encodedData}&callback=${callbackName}&_t=${Date.now()}`;
+          
+          console.log(`${action} JSONP URL:`, jsonpUrl.substring(0, 200) + '...');
+          
+          // スクリプトタグを作成
+          const script = document.createElement('script');
+          script.src = jsonpUrl;
+          script.setAttribute('data-callback', callbackName);
+          
+          script.onerror = function(error) {
+            console.error(`${action} JSONP読み込みエラー:`, error);
+            cleanup();
+            reject(new Error('サーバーとの通信に失敗しました'));
+          };
+          
+          document.head.appendChild(script);
+          
+          // タイムアウト設定（15秒）
+          setTimeout(() => {
+            if (window[callbackName]) {
+              cleanup();
+              reject(new Error(`${action}の通信がタイムアウトしました`));
+            }
+          }, 15000);
+          
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+    
+    /**
+     * 決済情報を表示
+     */
+    function displayPaymentInfo(sessionId, paymentData) {
+      console.log('=== 決済情報表示デバッグ ===');
+      console.log('sessionId:', sessionId);
+      console.log('paymentData:', paymentData);
+      console.log('paymentData.total_amount:', paymentData.total_amount);
+      console.log('paymentData.metadata:', paymentData.metadata);
+      
+      // セッションIDを短縮版で表示
+      const shortSessionId = sessionId.length > 20 ? sessionId.substring(sessionId.length - 16) : sessionId;
+      document.getElementById('session-id').textContent = shortSessionId;
+      
+      // 合計金額を表示（複数のソースから取得を試行）
+      let totalAmount = 0;
+      let amountSource = 'unknown';
+      
+      // 1. paymentData.total_amountから取得
+      if (paymentData.total_amount && paymentData.total_amount !== 'unknown') {
+        totalAmount = parseInt(paymentData.total_amount);
+        amountSource = 'paymentData.total_amount';
+        console.log('金額ソース1 (paymentData.total_amount):', totalAmount);
+        console.log('元の文字列値:', paymentData.total_amount);
+      }
+      // 2. metadataから取得
+      else if (paymentData.metadata && paymentData.metadata.total_amount) {
+        totalAmount = parseInt(paymentData.metadata.total_amount);
+        amountSource = 'metadata.total_amount';
+        console.log('金額ソース2 (metadata.total_amount):', totalAmount);
+      }
+      // 3. フォールバック：URLパラメータから取得
+      else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get('data');
+        console.log('URLパラメータdata:', dataParam);
+        
+        if (dataParam) {
+          try {
+            const reservationData = JSON.parse(decodeURIComponent(atob(dataParam)));
+            console.log('URLから復元した予約データ:', reservationData);
+            
+            if (reservationData.items) {
+              totalAmount = reservationData.items.reduce((sum, item) => {
+                const itemTotal = parseInt(item.price) * parseInt(item.qty);
+                console.log(`商品計算: ${item.name} - ${item.price}円 × ${item.qty}個 = ${itemTotal}円`);
+                return sum + itemTotal;
+              }, 0);
+              amountSource = 'URL_parameter_calculation';
+              console.log('金額ソース3 (URL計算):', totalAmount);
+            }
+          } catch (error) {
+            console.warn('URLパラメータからの金額取得失敗:', error);
+          }
+        }
+      }
+      
+      console.log('最終決定金額:', totalAmount, 'ソース:', amountSource);
+      console.log('=== デバッグ情報終了 ===');
+      
+      if (totalAmount > 0) {
+        document.getElementById('payment-amount').textContent = totalAmount.toLocaleString() + '円';
+      } else {
+        document.getElementById('payment-amount').textContent = '金額情報取得中...';
+      }
+      
+      document.getElementById('payment-date').textContent = new Date().toLocaleString('ja-JP');
+      document.getElementById('payment-details').style.display = 'block';
+    }
+    
+    /**
+     * 予約情報を表示
+     */
+    function displayReservationInfo(paymentData) {
+      const metadata = paymentData.metadata || paymentData;
+      
+      document.getElementById('customer-name').textContent = metadata.customer_name || '-';
+      document.getElementById('pickup-store').textContent = metadata.pickup_store || '-';
+      document.getElementById('pickup-datetime').textContent = 
+        `${metadata.pickup_date || '-'} ${metadata.pickup_time || '-'}`;
+      
+      // 注文商品リストを表示
+      const itemsContainer = document.getElementById('order-items');
+      itemsContainer.innerHTML = '';
+      
+      try {
+        const orderItems = metadata.order_items ? JSON.parse(metadata.order_items) : [];
+        
+        if (orderItems.length > 0) {
+          orderItems.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.style.cssText = 'margin: 4px 0; padding: 4px 0; border-bottom: 1px dotted #ccc;';
+            itemDiv.innerHTML = `
+              <span style="font-weight: bold;">${item.name}</span> × ${item.qty}個
+              <span style="float: right;">${(item.price * item.qty).toLocaleString()}円</span>
+            `;
+            itemsContainer.appendChild(itemDiv);
+          });
+        } else {
+          itemsContainer.innerHTML = '<div>注文情報が取得できませんでした</div>';
+        }
+      } catch (error) {
+        console.error('商品情報の解析エラー:', error);
+        itemsContainer.innerHTML = '<div>注文情報の表示エラー</div>';
+      }
+      
+      document.getElementById('reservation-details').style.display = 'block';
+    }
+    
+    /**
+     * GASに予約情報を送信
+     */
+    async function submitReservationToGas(sessionId, paymentData) {
+      try {
+        console.log('GASに予約情報送信開始');
+        
+        const metadata = paymentData.metadata || paymentData;
+        
+        // metadataから商品情報を復元
+        let items = [];
+        try {
+          items = metadata.order_items ? JSON.parse(metadata.order_items) : [];
+        } catch (error) {
+          console.error('商品情報の解析エラー:', error);
+          items = [];
+        }
+        
+        // 決済済みフラグを追加
+        const reservationData = {
+          name: metadata.customer_name,
+          phone: metadata.customer_phone,
+          email: metadata.customer_email,
+          store: metadata.pickup_store,
+          pickup_date: metadata.pickup_date,
+          pickup_time: metadata.pickup_time,
+          note: metadata.pickup_note || '',
+          items: items,
+          payment_status: 'completed',
+          payment_session_id: sessionId,
+          payment_amount: parseInt(metadata.total_amount) || 0,
+          payment_date: new Date().toISOString()
+        };
+        
+        console.log('送信データ:', reservationData);
+        
+        // JSONP方式でGASに送信（index.htmlと同じ方式）
+        const result = await sendToGasViaJsonp(reservationData);
+        
+        console.log('GAS応答:', result);
+        
+        if (result && result.success) {
+          // 成功時の表示
+          document.getElementById('processing-status').style.display = 'none';
+          document.getElementById('success-message').style.display = 'block';
+          document.getElementById('close-instruction').style.display = 'block';
+          document.getElementById('action-buttons').style.display = 'block';
+        } else {
+          // 失敗時の表示
+          throw new Error(result ? result.error : '予約登録に失敗しました');
+        }
+        
+      } catch (error) {
+        console.error('予約送信エラー:', error);
+        showError(error.message, sessionId);
+      }
+    }
+    
+    /**
+     * JSONP方式でGASにデータ送信（既存の関数を簡素化）
+     */
+    async function sendToGasViaJsonp(data) {
+      return await fetchFromGasViaJsonp('submitPaymentReservation', data);
+    }
+    
+    /**
+     * エラー表示
+     */
+    function showError(message, sessionId = null) {
+      document.getElementById('processing-status').style.display = 'none';
+      document.getElementById('error-message-detail').textContent = message;
+      
+      if (sessionId) {
+        // セッションIDを短縮版で表示
+        const shortSessionId = sessionId.length > 20 ? sessionId.substring(sessionId.length - 16) : sessionId;
+        document.getElementById('error-session-id').textContent = shortSessionId;
+      }
+      
+      document.getElementById('error-details').style.display = 'block';
+      document.getElementById('close-instruction').style.display = 'block';
+      document.getElementById('action-buttons').style.display = 'block';
+    }
+  </script>
+</body>
+</html> 

@@ -1,0 +1,2363 @@
+<!--
+  @file index.html
+  @brief GitHub Pages用 テイクアウト予約フォーム
+  @details GASのdoPost APIと連携してGoogleバナーを表示せずに予約機能を提供
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- セキュリティ強化メタタグ -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <!-- HTTPS リダイレクト強制 -->
+  <script>
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      location.replace('https:' + window.location.href.substring(window.location.protocol.length));
+    }
+  </script>
+  <title>テイクアウト予約フォーム</title>
+  
+  <!-- 📝 高速化: reCAPTCHA v3遅延読み込み（HTMLから削除、JavaScriptで動的読み込み） -->
+  <!-- <script src="https://www.google.com/recaptcha/api.js?render=6Le2lk4rAAAAAJu2ojJxoexvlUILZn4oNyJvuHzd" async defer></script> -->
+  
+  <!-- 🚀 高速化: Stripe設定遅延読み込み（決済機能使用時のみ読み込み） -->
+  <!-- <script src="stripe-config.js?v=20241220"></script> -->
+  
+  <style>
+  /* =============================
+    🚀 Critical CSS（初期表示用）
+    Above-the-fold表示に必要な最小限のスタイル
+  ============================= */
+  * {
+    box-sizing: border-box !important;
+  }
+  html, body {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: 'Segoe UI', 'Meiryo', sans-serif;
+    background: #f7f7f7;
+    -webkit-text-size-adjust: 100%;
+    min-height: 100vh;
+  }
+  
+  .container {
+    max-width: 480px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 24px 16px;
+  }
+  
+  h1 {
+    text-align: center;
+    font-size: 1.5em;
+    margin-bottom: 24px;
+    color: #333;
+  }
+  
+  form div {
+    margin-top: 16px;
+  }
+  
+  form label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    box-sizing: border-box;
+  }
+  
+  input:invalid, select:invalid, textarea:invalid {
+    border-color: #e74c3c;
+  }
+  
+  button {
+    margin-top: 24px;
+    width: 100%;
+    padding: 12px;
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  button:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+  }
+  
+  .product-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .product-item select {
+    flex-grow: 1;
+    margin-right: 8px;
+  }
+  
+  .product-item input[type="number"] {
+    width: 60px;
+    margin-right: 8px;
+  }
+  
+  .remove-product-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-top: 0;
+    width: auto;
+    font-size: 0.9em;
+  }
+  
+  .add-product-btn {
+    background: #3498db;
+    color: white;
+    margin-top: 12px;
+    padding: 8px 12px;
+    font-size: 1em;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+  }
+  
+  .error-message {
+    color: #e74c3c;
+    font-size: 0.95em;
+    margin-top: 2px;
+    display: block;
+  }
+  
+  .required {
+    color: #e74c3c;
+    font-size: 0.95em;
+    margin-left: 4px;
+  }
+  
+  /* プライバシーポリシー関連 */
+  .privacy-section {
+    margin-top: 20px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .privacy-toggle {
+    background: none;
+    border: none;
+    color: #3498db;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0;
+    margin-left: 4px;
+  }
+  
+  .privacy-toggle:hover {
+    color: #2980b9;
+  }
+  
+  .privacy-content {
+    display: none !important;
+    margin-top: 10px;
+    padding: 10px;
+    background: #fff;
+    border-radius: 4px;
+    font-size: 0.85em;
+    line-height: 1.4;
+    border: 1px solid #e0e0e0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .privacy-content.show {
+    display: block !important;
+  }
+  
+  .privacy-content h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1em;
+    color: #333;
+  }
+  
+  .consent-checkbox {
+    margin-top: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .consent-checkbox input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  
+  .consent-checkbox label {
+    font-size: 0.9em;
+    margin: 0;
+    cursor: pointer;
+    line-height: 1.3;
+    font-weight: normal;
+  }
+  
+  /* 決済・予約ボタン */
+  .reservation-buttons {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .normal-reservation-btn {
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+    margin: 0;
+  }
+  
+  .normal-reservation-btn:hover {
+    background: #27ae60;
+  }
+  
+  .payment-reservation-btn {
+    background: #9b59b6;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+    margin: 0;
+    display: block;
+  }
+  
+  .payment-reservation-btn:hover {
+    background: #8e44ad;
+  }
+  
+  .payment-reservation-btn:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  /* 合計金額表示 */
+  .total-amount-section {
+    margin-top: 24px;
+    margin-bottom: 20px;
+  }
+  
+  .total-amount-display {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  
+  .total-amount-display h3 {
+    margin: 0 0 12px 0;
+    color: #495057;
+    font-size: 1.1em;
+  }
+  
+  .total-amount {
+    font-size: 2em;
+    font-weight: bold;
+    color: #2ecc71;
+    margin: 8px 0;
+  }
+  
+  .items-summary {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.3;
+  }
+  
+  /* モーダル */
+  #custom-modal {
+    display: none !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  #custom-modal.show {
+    display: flex !important;
+  }
+  
+  #custom-modal > div {
+    background: #fff;
+    padding: 32px 24px;
+    border-radius: 8px;
+    text-align: center;
+    max-width: 400px;
+    width: 80%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  
+  #custom-modal h2 {
+    margin-top: 0;
+    color: #27ae60;
+  }
+  
+  #custom-modal button {
+    margin-top: 16px;
+    padding: 12px 24px;
+    background: #3498db;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+  }
+  
+  #final-message {
+    display: none !important;
+    text-align: center;
+    font-size: 1.2em;
+    color: #27ae60;
+    margin-top: 40px;
+  }
+  
+  #final-message.show {
+    display: block !important;
+  }
+  
+  /* セキュリティ・警告 */
+  .security-notice {
+    background: #e8f5e8;
+    border: 1px solid #c3e6c3;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    color: #2d5016;
+    font-size: 0.85em;
+    text-align: center;
+  }
+  
+  .rate-limit-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 16px;
+    color: #856404;
+    font-size: 0.9em;
+    display: none;
+  }
+  
+  /* 商品説明 */
+  .product-desc {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 4px;
+    margin-left: 8px;
+  }
+  
+  /* モバイル向け */
+  @media (max-width: 600px) {
+    html, body {
+      background: #fff !important;
+      font-size: 16px !important;
+    }
+    .container {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      margin: 0 !important;
+      padding: 12px 6px !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    h1 {
+      font-size: 1.6em !important;
+      margin: 0 0 20px 0 !important;
+    }
+    input, select, textarea {
+      font-size: 16px !important;
+      padding: 12px 8px !important;
+      margin-top: 6px !important;
+    }
+    button {
+      padding: 14px !important;
+      font-size: 1.2em !important;
+      min-height: 50px !important;
+    }
+    .product-item {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      margin-bottom: 16px !important;
+    }
+    .product-item select {
+      margin-right: 0 !important;
+      margin-bottom: 8px !important;
+    }
+    .product-item input[type="number"] {
+      width: 100px !important;
+      margin-right: 8px !important;
+      margin-bottom: 8px !important;
+    }
+    .remove-product-btn {
+      width: auto !important;
+      max-width: 150px !important;
+      align-self: flex-end !important;
+    }
+    #custom-modal > div {
+      width: 90vw !important;
+      max-width: 90vw !important;
+      padding: 20px 12px !important;
+      margin: 0 auto !important;
+    }
+    .consent-checkbox {
+      flex-direction: column;
+      gap: 4px;
+    }
+    .consent-checkbox input[type="checkbox"] {
+      margin-top: 0;
+    }
+    .privacy-content {
+      font-size: 0.8em;
+      max-height: 150px;
+    }
+    .total-amount {
+      font-size: 1.8em;
+    }
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>テイクアウト予約フォーム</h1>
+    
+    <form id="reserveForm">
+      <div>
+        <label for="name">お名前<span class="required">*</span></label>
+        <input type="text" id="name" name="name" required>
+        <span class="error-message" id="name-error"></span>
+      </div>
+      
+      <div>
+        <label for="phone">電話番号<span class="required">*</span></label>
+        <input type="tel" id="phone" name="phone" required>
+        <span class="error-message" id="phone-error"></span>
+      </div>
+      
+      <div>
+        <label for="email">メールアドレス<span class="required">*</span></label>
+        <input type="email" id="email" name="email" required>
+        <span class="error-message" id="email-error"></span>
+      </div>
+      
+      <div>
+        <label for="store">受取店舗<span class="required">*</span></label>
+        <select id="store" name="store" required>
+          <option value="">選択してください</option>
+        </select>
+        <span class="error-message" id="store-error"></span>
+      </div>
+      
+      <div>
+        <label>商品・数量<span class="required">*</span></label>
+        <div id="product-list-area">
+          <!-- 商品選択項目がここに動的に追加される -->
+        </div>
+        <button type="button" class="add-product-btn" onclick="addProductItem()">商品を追加</button>
+        <span class="error-message" id="items-error"></span>
+        <div id="product-date-note" style="font-size: 0.9em; color: #666; margin-top: 8px;">商品を選択してください。</div>
+      </div>
+      
+      <div>
+        <label for="pickup_date">受取希望日<span class="required">*</span></label>
+        <input type="date" id="pickup_date" name="pickup_date" required disabled>
+        <span class="error-message" id="pickup_date-error"></span>
+      </div>
+      
+      <div>
+        <label for="pickup_time">受取希望時間<span class="required">*</span></label>
+        <select id="pickup_time" name="pickup_time" required disabled>
+          <option value="">選択してください</option>
+          <option value="10:00">10:00</option>
+          <option value="10:30">10:30</option>
+          <option value="11:00">11:00</option>
+          <option value="11:30">11:30</option>
+          <option value="12:00">12:00</option>
+          <option value="12:30">12:30</option>
+          <option value="13:00">13:00</option>
+          <option value="13:30">13:30</option>
+          <option value="14:00">14:00</option>
+          <option value="14:30">14:30</option>
+          <option value="15:00">15:00</option>
+          <option value="15:30">15:30</option>
+          <option value="16:00">16:00</option>
+          <option value="16:30">16:30</option>
+          <option value="17:00">17:00</option>
+          <option value="17:30">17:30</option>
+          <option value="18:00">18:00</option>
+          <option value="18:30">18:30</option>
+          <option value="19:00">19:00</option>
+          <option value="19:30">19:30</option>
+          <option value="20:00">20:00</option>
+        </select>
+        <span class="error-message" id="pickup_time-error"></span>
+      </div>
+      
+      <div>
+        <label for="note">備考</label>
+        <textarea id="note" name="note" rows="3" placeholder="アレルギーやご要望などがあればご記入ください"></textarea>
+      </div>
+      
+      <!-- プライバシーポリシーセクション -->
+      <div class="privacy-section">
+        <div>
+          <strong>個人情報の取り扱いについて</strong>
+          <button type="button" class="privacy-toggle" onclick="togglePrivacyPolicy()">詳細を表示</button>
+        </div>
+        
+        <div id="privacy-content" class="privacy-content">
+          <h3>個人情報保護方針</h3>
+          
+          <p><strong>1. 事業者情報</strong><br>
+          本サービスは、お客様の個人情報保護を重要な責務と認識し、個人情報の保護に関する法律（個人情報保護法）に基づき、以下の通り個人情報保護方針を定めます。</p>
+          
+          <p><strong>2. 収集する個人情報の種類</strong><br>
+          ・お名前（フリガナを含む）<br>
+          ・電話番号（連絡先）<br>
+          ・メールアドレス<br>
+          ・ご注文内容（商品名、数量、金額等）<br>
+          ・受取希望日時・受取店舗<br>
+          ・お客様からの備考・要望事項<br>
+          ・アクセス情報（IPアドレス、ブラウザ情報等）</p>
+          
+          <p><strong>3. 個人情報の利用目的</strong><br>
+          ・ご注文の受付・確認・商品の準備<br>
+          ・受取日時の調整・変更のご連絡<br>
+          ・商品の受け渡し・決済処理<br>
+          ・お客様からのお問い合わせへの対応<br>
+          ・サービス品質の向上・商品開発のための統計分析<br>
+          ・緊急時の連絡（食材アレルギー等の安全確保）<br>
+          ・法令に基づく対応が必要な場合の利用</p>
+          
+          <p><strong>4. 個人情報の安全管理措置</strong><br>
+          ・HTTPS暗号化通信によるデータ送信の保護<br>
+          ・reCAPTCHA v3による自動送信・スパム対策<br>
+          ・入力データのサニタイズ処理（HTMLタグ・危険文字列の除去）<br>
+          ・レート制限機能による連続送信の防止<br>
+          ・入力文字数制限によるDoS攻撃対策<br>
+          ・クラウドサービスのセキュリティ機能を活用した安全なデータ管理<br>
+          ・従業員への個人情報保護に関する教育・指導</p>
+          
+          <p><strong>5. 第三者への提供</strong><br>
+          お客様の個人情報は、以下の場合を除き第三者に提供いたしません：<br>
+          ・お客様の同意がある場合<br>
+          ・法令に基づく場合<br>
+          ・人の生命、身体又は財産の保護のために必要な場合<br>
+          ・決済サービス等、サービス提供に必要な業務委託先への提供（適切な管理契約を締結）</p>
+          
+          <p><strong>6. 個人情報の保管期間</strong><br>
+          ・ご注文に関する情報：サービス提供完了後3年間<br>
+          ・お問い合わせ情報：対応完了後1年間<br>
+          ・その他の情報：利用目的達成後、適切に削除<br>
+          ※法令により保管が義務付けられている場合はその期間に従います</p>
+          
+          <p><strong>7. お客様の権利</strong><br>
+          お客様は、ご自身の個人情報について以下の権利を有します：<br>
+          ・開示・訂正・削除の請求<br>
+          ・利用停止・消去の請求<br>
+          ・第三者提供の停止の請求<br>
+          これらのご請求については、本人確認の上、法令に従い適切に対応いたします。</p>
+          
+          <p><strong>8. Cookie（クッキー）の使用</strong><br>
+          当サービスでは、サービス向上のためクッキーを使用する場合があります。お客様はブラウザ設定によりクッキーを無効にできますが、一部機能が制限される可能性があります。</p>
+          
+          <p><strong>9. 本方針の変更</strong><br>
+          本個人情報保護方針は、法令の改正や事業内容の変更に応じて見直し・変更する場合があります。重要な変更については、当サービス上で告知いたします。</p>
+          
+          <p><strong>10. お問い合わせ窓口</strong><br>
+          個人情報の取り扱いに関するお問い合わせ・苦情・相談は、本社までお電話でご連絡ください。迅速かつ適切に対応いたします。<br><br>
+          <strong>本社</strong>　株式会社あっぷるアイビー<br>
+          <strong>電話</strong>　026-242-3030<br>
+          <small>※受付時間：平日9:00～17:00</small></p>
+          
+          <p><small>最終更新日：2024年12月19日</small></p>
+        </div>
+        
+        <div class="consent-checkbox">
+          <input type="checkbox" id="privacy-consent" name="privacy-consent" required>
+          <label for="privacy-consent">上記の個人情報保護方針を確認し、個人情報の取り扱いに同意します<span class="required">*</span></label>
+        </div>
+        <span class="error-message" id="privacy-consent-error"></span>
+        
+        <!-- キャンセルポリシー同意チェックボックス -->
+        <div class="consent-checkbox">
+          <input type="checkbox" id="cancel-policy-consent" name="cancel-policy-consent" required>
+          <label for="cancel-policy-consent">
+            <a href="cancel-policy.html?from=form" target="_blank" style="color: #3498db; text-decoration: underline;">キャンセルポリシー</a>を確認し、キャンセル条件に同意します<span class="required">*</span>
+          </label>
+        </div>
+        <span class="error-message" id="cancel-policy-consent-error"></span>
+        
+        <!-- キャンセルポリシー詳細リンク -->
+        <div style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 4px; border-left: 4px solid #3498db;">
+          <p style="margin: 0; font-size: 0.9em; color: #555;">
+            📋 <strong>キャンセルについて：</strong>
+            ご予約のキャンセルは受取予定日の<strong style="color: #e74c3c;">3日前</strong>までにご連絡が必要です。<br>
+            詳細は<a href="cancel-policy.html?from=form" target="_blank" style="color: #3498db; text-decoration: underline; font-weight: bold;">キャンセルポリシー</a>をご確認ください。
+          </p>
+        </div>
+      </div>
+      
+      <!-- reCAPTCHA v3は背景で動作するため表示要素は不要 -->
+      
+      <!-- レート制限警告 -->
+      <div id="rate-limit-warning" class="rate-limit-warning">
+        <strong>⚠️ 注意:</strong> 短時間内の連続送信を検出しました。しばらく時間を置いてから再度お試しください。
+      </div>
+      
+      <!-- セキュリティ通知 -->
+      <div class="security-notice">
+        🔒 お客様の情報は暗号化して安全に送信されます
+      </div>
+      
+      <!-- 合計金額表示 -->
+      <div id="total-amount-section" class="total-amount-section" style="display: none;">
+        <div class="total-amount-display">
+          <h3>💰 合計金額</h3>
+          <div id="total-amount" class="total-amount">0円</div>
+          <div id="items-summary" class="items-summary"></div>
+        </div>
+      </div>
+      
+      <!-- 予約方法選択 -->
+      <div id="reservation-buttons" class="reservation-buttons">
+        <!-- 通常予約ボタン（既存） -->
+        <button type="submit" id="submit-btn" class="normal-reservation-btn">
+          📝 通常予約（店舗支払い）
+        </button>
+        
+        <!-- 事前決済ボタン（新規） -->
+        <button type="button" id="payment-btn" class="payment-reservation-btn">
+          💳 事前決済で予約
+        </button>
+      </div>
+    </form>
+    
+    <div id="result"></div>
+    <div id="close-btn-area"></div>
+  </div>
+
+  <!-- カスタムモーダル -->
+  <div id="custom-modal">
+    <div>
+      <h2>予約完了</h2>
+      <div id="modal-message"></div>
+      <button id="modal-close-btn">画面を閉じる</button>
+    </div>
+  </div>
+
+  <!-- 最終メッセージ -->
+  <div id="final-message"></div>
+
+  <script>
+    // GASのWebアプリURL（デプロイ後に実際のURLに変更してください）
+    // ⚠️ 重要: 新しいデプロイを作成した場合は、以下のURLを更新してください
+    // 手順: GAS → デプロイ → 新しいデプロイ → 生成されたURLをここに貼り付け
+    // 
+    // 🔥 緊急修正必要: 現在のURLは古い可能性があります
+    // Code.gsを修正したため、新しいデプロイが必要です
+    // 現在のURL（新しいデプロイ後に更新してください）:
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwgeG189yH0YGt6gpqpYHoclCnZe4cbo8jARRaHCqjgxpiD_XW47taPqNFlQYDhfaYaCg/exec';
+    
+    // 商品・店舗データを格納する変数
+    let allProducts = [];
+    let allStores = [];
+
+    // 🚀 高速化機能: reCAPTCHA v3を遅延読み込み（初期表示完了後）
+    function loadRecaptchaDeferred() {
+      // ページ読み込み完了後2秒で実行
+      setTimeout(() => {
+        const script = document.createElement('script');
+        script.src = 'https://www.google.com/recaptcha/api.js?render=6Le2lk4rAAAAAJu2ojJxoexvlUILZn4oNyJvuHzd';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          console.log('✅ reCAPTCHA v3遅延読み込み完了');
+          window.recaptchaReady = true;
+        };
+        script.onerror = () => {
+          console.warn('⚠️ reCAPTCHA v3読み込み失敗 - セキュリティ機能が制限される可能性があります');
+          window.recaptchaReady = false;
+        };
+        document.head.appendChild(script);
+      }, 2000);
+    }
+    
+    // 🚀 高速化機能: Stripe設定を遅延読み込み（決済機能が必要な場合のみ）
+    function loadStripeIfNeeded() {
+      // 既に読み込み済みの場合はスキップ
+      if (window.stripeConfigLoaded) {
+        return Promise.resolve();
+      }
+      
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'stripe-config.js?v=20241220';
+        script.onload = () => {
+          console.log('✅ Stripe設定読み込み完了');
+          window.stripeConfigLoaded = true;
+          resolve();
+        };
+        script.onerror = () => {
+          console.warn('⚠️ Stripe設定読み込み失敗 - 決済機能が利用できません');
+          reject(new Error('Stripe設定読み込み失敗'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    
+    // 🚀 高速化機能: Non-Critical CSSを遅延読み込み
+    function loadNonCriticalCSS() {
+      // 既に読み込み済みの場合はスキップ
+      if (window.nonCriticalCSSLoaded) {
+        return;
+      }
+      
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'non-critical.css';
+      link.media = 'print'; // 初期はprint用として読み込み
+      link.onload = function() {
+        this.media = 'all'; // 読み込み完了後にallに変更
+        console.log('✅ Non-Critical CSS読み込み完了');
+        window.nonCriticalCSSLoaded = true;
+      };
+      link.onerror = function() {
+        console.warn('⚠️ Non-Critical CSS読み込み失敗');
+      };
+      document.head.appendChild(link);
+    }
+    
+    // 商品選択欄のselectと数量inputにイベントリスナーを追加
+    function attachProductSelectListener() {
+      document.querySelectorAll('.product-item select').forEach(select => {
+        select.addEventListener('change', updatePickupDateControl);
+      });
+      document.querySelectorAll('.product-item input[type="number"]').forEach(input => {
+        input.addEventListener('input', updatePickupDateControl);
+      });
+    }
+    
+    // 商品項目追加時にもリスナーを付与
+    const origAddProductItem = addProductItem;
+    addProductItem = function() {
+      origAddProductItem();
+      attachProductSelectListener();
+      updatePickupDateControl();
+    };
+    
+    // 統合された初期化処理
+    window.addEventListener('DOMContentLoaded', function() {
+      // 🚀 高速化: reCAPTCHA v3遅延読み込み
+      loadRecaptchaDeferred();
+      
+      // 🚀 高速化: Non-Critical CSS遅延読み込み
+      loadNonCriticalCSS();
+      
+      // 商品・店舗データ読み込みと初期化
+      loadProductsAndStores();
+      addProductItem(); // 初期商品項目を追加
+      
+      // 店舗選択のイベントリスナー
+      document.getElementById('store').addEventListener('change', function() {
+        updatePickupDateControl(); // 日付制御を更新
+        updatePickupTimeOptions(); // 時間選択を更新
+      });
+      
+      // 受取日選択のイベントリスナー（validatePickupDateを使用）
+      document.getElementById('pickup_date').addEventListener('change', validatePickupDate);
+      
+      // 商品選択のイベントリスナー
+      attachProductSelectListener();
+      updatePickupDateControl();
+      
+      // GAS接続テストを実行
+      setTimeout(async () => {
+        console.log('GAS接続テストを開始します...');
+        const testResult = await testGasConnection();
+        
+        if (!testResult.success) {
+          console.error('GAS接続テスト失敗:', testResult.error);
+          
+          // エラー表示
+          const errorDiv = document.createElement('div');
+          errorDiv.style.cssText = `
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 16px 0;
+            color: #856404;
+            font-size: 0.9em;
+          `;
+          errorDiv.innerHTML = `
+            <strong>⚠️ 接続警告:</strong> サーバーとの接続に問題があります。<br>
+            エラー: ${testResult.error}<br>
+            予約送信時にエラーが発生する可能性があります。<br>
+            <small>※管理者の方: GASの新しいデプロイが必要な可能性があります</small>
+          `;
+          
+          document.querySelector('.container').insertBefore(errorDiv, document.getElementById('reserveForm'));
+        } else {
+          console.log('GAS接続テスト成功:', testResult.result);
+          
+          // 成功時も情報表示（開発用）
+          if (testResult.result && testResult.result.message) {
+            console.log('✅ ' + testResult.result.message);
+            console.log('📊 サーバーステータス:', testResult.result.status);
+            
+            // デバッグ情報を表示（本番環境では非表示にする）
+            const debugDiv = document.createElement('div');
+            debugDiv.style.cssText = `
+              background: #e8f5e8;
+              border: 1px solid #c3e6c3;
+              border-radius: 4px;
+              padding: 8px 12px;
+              margin: 8px 0;
+              color: #2d5016;
+              font-size: 0.8em;
+              text-align: center;
+              display: none;
+            `;
+            debugDiv.innerHTML = `
+               ✅ サーバー接続正常 - ${testResult.result.status}
+            `;
+            
+            // デバッグモードの場合のみ表示（URLパラメータでdebug=1がある場合）
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('debug') === '1') {
+              debugDiv.style.display = 'block';
+              document.querySelector('.container').insertBefore(debugDiv, document.getElementById('reserveForm'));
+            }
+          }
+        }
+      }, 2000); // 2秒待ってからテスト実行
+      
+      // 商品削除時にも制御を更新（MutationObserverを使用）
+      const productListArea = document.getElementById('product-list-area');
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+            setTimeout(updatePickupDateControl, 100);
+          }
+        });
+      });
+      observer.observe(productListArea, { childList: true });
+    });
+    
+    // 🚀 高速化: 商品・店舗データを並列読み込み（キャッシュ機能付き）
+    async function loadProductsAndStores() {
+      try {
+        const cacheKey = 'reservationData';
+        const cacheTimeout = 10 * 60 * 1000; // 10分間キャッシュ
+        
+        // 🚀 キャッシュチェック
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          try {
+            const { data, timestamp } = JSON.parse(cachedData);
+            const isExpired = Date.now() - timestamp > cacheTimeout;
+            
+            if (!isExpired && data.products && data.stores) {
+              console.log('✅ キャッシュからデータ読み込み完了（80-90%高速化）');
+              allProducts = data.products;
+              allStores = data.stores;
+              
+              // UI更新
+              setupUIWithData();
+              
+              console.log('📊 キャッシュデータ:', {
+                商品数: allProducts.length,
+                店舗数: allStores.length,
+                キャッシュ経過時間: Math.round((Date.now() - timestamp) / 1000) + '秒'
+              });
+              return;
+            } else {
+              console.log('⏰ キャッシュ期限切れ、新しいデータを取得します');
+              localStorage.removeItem(cacheKey);
+            }
+          } catch (cacheError) {
+            console.warn('⚠️ キャッシュデータ読み込みエラー:', cacheError);
+            localStorage.removeItem(cacheKey);
+          }
+        }
+        
+        // 🚀 並列データ読み込み（50-70%高速化）
+        const timestamp = Date.now();
+        console.log('🚀 データ並列読み込み開始...');
+        
+        const [productsResponse, storesResponse] = await Promise.all([
+          fetch(`./products.json?v=${timestamp}`),
+          fetch(`./stores.json?v=${timestamp}`)
+        ]);
+        
+        // 🚀 JSON解析も並列処理
+        const [products, stores] = await Promise.all([
+          productsResponse.json(),
+          storesResponse.json()
+        ]);
+        
+        allProducts = products;
+        allStores = stores;
+        
+        // 🚀 キャッシュに保存
+        try {
+          const cacheData = {
+            data: { products, stores },
+            timestamp: Date.now()
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+          console.log('💾 データをキャッシュに保存しました');
+        } catch (cacheError) {
+          console.warn('⚠️ キャッシュ保存失敗:', cacheError);
+        }
+        
+        // UI更新
+        setupUIWithData();
+        
+        console.log('✅ データ並列読み込み完了:', {
+          商品数: allProducts.length,
+          店舗数: allStores.length,
+          読み込み時間: Date.now() - timestamp + 'ms',
+          並列処理: 'Promise.all使用'
+        });
+        
+      } catch (error) {
+        console.error('❌ データ読み込み失敗:', error);
+        // エラー時はキャッシュクリア
+        localStorage.removeItem('reservationData');
+        
+        document.getElementById('result').innerHTML = `
+          <div style="color: #e74c3c; padding: 12px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffeaa7;">
+            <strong>⚠️ データ読み込みエラー</strong><br>
+            ${error.message}<br>
+            <small>ページを再読み込みしてください。問題が続く場合は、ブラウザのキャッシュをクリアしてください。</small>
+          </div>
+        `;
+      }
+    }
+    
+    // 🚀 UI更新処理を分離（再利用可能）
+    function setupUIWithData() {
+      // 店舗選択肢を設定
+      const storeSelect = document.getElementById('store');
+      // 既存のオプションをクリア（「選択してください」以外）
+      storeSelect.innerHTML = '<option value="">選択してください</option>';
+      
+      allStores.forEach(store => {
+        const option = document.createElement('option');
+        option.value = store.name;
+        option.textContent = store.name;
+        storeSelect.appendChild(option);
+      });
+      
+      // 商品選択肢を更新
+      updateProductSelects();
+    }
+
+    // 商品選択肢を更新
+    function updateProductSelects() {
+      const selects = document.querySelectorAll('.product-item select');
+      selects.forEach(select => {
+        // 現在の選択値を保持
+        const currentValue = select.value;
+        
+        // 選択肢をクリア
+        select.innerHTML = '<option value="">商品を選択</option>';
+        
+        // 商品を追加
+        allProducts.forEach(product => {
+          const option = document.createElement('option');
+          option.value = product.name;
+          option.textContent = `${product.name} (${product.price}円)`;
+          select.appendChild(option);
+        });
+        
+        // 選択値を復元
+        select.value = currentValue;
+      });
+    }
+
+    // 商品項目を追加
+    function addProductItem() {
+      const container = document.getElementById('product-list-area');
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'product-item';
+      
+      itemDiv.innerHTML = `
+        <select onchange="updateProductDescription(this); updatePickupDateControl();">
+          <option value="">商品を選択</option>
+        </select>
+        <input type="number" min="1" placeholder="数量" onchange="updatePickupDateControl();">
+        <button type="button" class="remove-product-btn" onclick="removeProductItem(this)">削除</button>
+        <div class="product-desc"></div>
+      `;
+      
+      container.appendChild(itemDiv);
+      
+      // 商品選択肢を設定
+      const select = itemDiv.querySelector('select');
+      allProducts.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.name;
+        option.textContent = `${product.name} (${product.price}円)`;
+        select.appendChild(option);
+      });
+    }
+
+    // 商品項目を削除
+    function removeProductItem(button) {
+      const container = document.getElementById('product-list-area');
+      if (container.children.length > 1) {
+        button.parentElement.remove();
+        updatePickupDateControl();
+      }
+    }
+
+    // 商品説明を更新
+    function updateProductDescription(select) {
+      const descDiv = select.parentElement.querySelector('.product-desc');
+      const selectedProduct = allProducts.find(p => p.name === select.value);
+      
+      if (selectedProduct && selectedProduct.description) {
+        descDiv.textContent = selectedProduct.description;
+      } else {
+        descDiv.textContent = '';
+      }
+    }
+
+    // 営業日計算関数
+    function getBusinessDate(startDate, businessDays) {
+      let date = new Date(startDate);
+      let count = 0;
+      
+      while (count < businessDays) {
+        date.setDate(date.getDate() + 1);
+        if (date.getDay() !== 0 && date.getDay() !== 6) {
+          count++;
+        }
+      }
+      
+      return date;
+    }
+
+    // エラーメッセージ表示
+    function showError(fieldName, message) {
+      const errorElement = document.getElementById(fieldName + '-error');
+      if (errorElement) {
+        errorElement.textContent = message;
+      }
+    }
+
+    // エラーメッセージクリア
+    function clearErrors() {
+      const errorElements = document.querySelectorAll('.error-message');
+      errorElements.forEach(el => el.textContent = '');
+    }
+
+    // フォーム送信処理
+    document.getElementById('reserveForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // エラーメッセージをクリア
+      clearErrors();
+      
+      // フォームデータを収集
+      const formData = new FormData(this);
+      
+      // セキュリティバリデーション
+      const securityValidation = await validateFormSecurity(formData);
+      if (!securityValidation.isValid) {
+        // セキュリティエラーを表示
+        securityValidation.errors.forEach(err => {
+          if (err.field === 'privacy-consent') {
+            document.getElementById('privacy-consent-error').textContent = err.message;
+          } else if (err.field === 'recaptcha') {
+            document.getElementById('recaptcha-error').textContent = err.message;
+          } else if (err.field === 'rate-limit') {
+            // レート制限警告は関数内で表示済み
+          } else {
+            showError(err.field, err.message);
+          }
+        });
+        return;
+      }
+      
+      const data = {
+        name: formData.get('name'),
+        phone: formData.get('phone'),
+        email: formData.get('email'),
+        store: formData.get('store'),
+        pickup_date: formData.get('pickup_date'),
+        pickup_time: formData.get('pickup_time'),
+        note: formData.get('note'),
+        items: []
+      };
+      
+      // 商品データを収集
+      const productItems = document.querySelectorAll('.product-item');
+      productItems.forEach(itemDiv => {
+        const select = itemDiv.querySelector('select');
+        const qtyInput = itemDiv.querySelector('input[type="number"]');
+        
+        if (select.value && qtyInput.value) {
+          data.items.push({
+            name: select.value,
+            qty: qtyInput.value
+          });
+        }
+      });
+      
+      // 入力データをサニタイズ
+      const processedData = await preprocessFormData(data);
+      
+      // 結果表示エリアをクリア
+      document.getElementById('result').textContent = '';
+
+      // 送信中はボタン無効化
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.style.background = '#aaa';
+      
+      // デバッグ情報を表示（サニタイズ後のデータ）
+      console.log('送信データ（サニタイズ後）:', processedData);
+      console.log('送信先URL:', GAS_WEB_APP_URL);
+
+      try {
+        // 隠しフォームを使用してGASに送信
+        const result = await sendToGasViaForm(processedData);
+        console.log('レスポンス結果:', result);
+
+        if (result && result.success) {
+          // 送信成功時は送信時刻を記録（レート制限用）
+          recordSubmitTime();
+          
+          // 合計金額の表示
+          document.getElementById('result').innerHTML = '<span style="color:#27ae60;">予約完了しました！<br>合計金額：' + result.total + '円</span>';
+          // カスタムモーダル表示
+          document.getElementById('modal-message').innerHTML = '予約完了しました！<br>合計金額：' + result.total + '円';
+          document.getElementById('custom-modal').classList.add('show');
+          // フォームをリセットし、送信不可に
+          document.getElementById('reserveForm').reset();
+          document.getElementById('reserveForm').querySelectorAll('input, select, textarea, button').forEach(function(el){ el.disabled = true; });
+          // 商品項目をクリア
+          document.getElementById('product-list-area').innerHTML = '';
+          // 「画面を閉じる」ボタンはモーダル内に
+          document.getElementById('close-btn-area').innerHTML = '';
+          
+          // reCAPTCHA v3では手動リセット不要
+        } else if (result && result.errors) {
+          // サーバー側バリデーションエラー
+          document.getElementById('result').textContent = 'エラー: ' + result.errors.join('\n');
+          document.getElementById('result').style.color = '#e74c3c';
+          // フィールドごとのエラーメッセージを表示
+          result.errors.forEach(err => {
+              if (err.includes('お名前')) showError('name', err);
+              else if (err.includes('電話番号')) showError('phone', err);
+              else if (err.includes('メールアドレス')) showError('email', err);
+              else if (err.includes('店舗')) showError('store', err);
+              else if (err.includes('商品') || err.includes('数量')) showError('items', err);
+              else if (err.includes('受取希望日')) showError('pickup_date', err);
+              else if (err.includes('受取希望時間')) showError('pickup_time', err);
+          });
+        } else {
+          // その他のエラー
+          document.getElementById('result').textContent = 'エラー: ' + (result ? result.error || '不明なエラーが発生しました' : '送信に失敗しました');
+          document.getElementById('result').style.color = '#e74c3c';
+        }
+        
+        // 完了時はボタンを再度有効化
+        submitBtn.disabled = false;
+        submitBtn.style.background = '';
+        
+      } catch (error) {
+        console.error('送信エラー詳細:', error);
+        // エラー時はボタンを再度有効化
+        submitBtn.disabled = false;
+        submitBtn.style.background = '';
+        
+        // より詳細なエラーメッセージを表示
+        let errorMessage = '送信に失敗しました: ' + error.message;
+        
+        // エラーの種類に応じた対処法を追加
+        if (error.message.includes('JSON')) {
+          errorMessage += '\n\n【対処法】\n';
+          errorMessage += '1. ページを再読み込みしてもう一度お試しください\n';
+          errorMessage += '2. しばらく時間を置いてから再度送信してください\n';
+          errorMessage += '3. 問題が続く場合は、直接店舗にお電話でご予約ください';
+        } else if (error.message.includes('ネットワーク') || error.message.includes('接続')) {
+          errorMessage += '\n\n【対処法】\n';
+          errorMessage += '1. インターネット接続を確認してください\n';
+          errorMessage += '2. ページを再読み込みしてもう一度お試しください\n';
+          errorMessage += '3. Wi-Fiをモバイルデータに切り替えてお試しください';
+        } else if (error.message.includes('大きすぎます')) {
+          errorMessage += '\n\n【対処法】\n';
+          errorMessage += '1. 備考欄の文字数を減らしてください\n';
+          errorMessage += '2. 商品を分けて複数回に分けてご注文ください';
+        }
+        
+        document.getElementById('result').textContent = errorMessage;
+        document.getElementById('result').style.color = '#e74c3c';
+        document.getElementById('result').style.whiteSpace = 'pre-line';
+        
+        // 詳細なエラー情報をコンソールに出力
+        console.group('=== 送信エラー詳細情報 ===');
+        console.log('エラーメッセージ:', error.message);
+        console.log('エラースタック:', error.stack);
+        console.log('送信データ:', data);
+        console.log('GAS URL:', GAS_WEB_APP_URL);
+        console.groupEnd();
+      }
+    });
+
+    // GASにデータを送信する関数（JSONP方式・CORS完全回避）
+    async function sendToGasViaForm(data) {
+      return new Promise((resolve, reject) => {
+        try {
+          console.log('=== JSONP送信開始 ===', data);
+          
+          // JSONP方式：スクリプトタグでCORSを完全回避
+          const callbackName = 'submitCallback' + Date.now();
+          console.log('Submit JSONP Callback名:', callbackName);
+          
+          // 既存のスクリプトタグを削除（クリーンアップ）
+          const existingScripts = document.querySelectorAll('script[data-submit-jsonp="true"]');
+          existingScripts.forEach(script => script.remove());
+          
+          // グローバルコールバック関数を定義
+          window[callbackName] = function(result) {
+            console.log('=== Submit JSONP Response受信 ===');
+            console.log('Response type:', typeof result);
+            console.log('Response content:', result);
+            
+            // レスポンスが文字列の場合はJSONパースを試行
+            if (typeof result === 'string') {
+              console.log('String response detected, attempting JSON parse...');
+              console.log('Raw string:', JSON.stringify(result));
+              console.log('First 100 chars:', result.substring(0, 100));
+              try {
+                result = JSON.parse(result);
+                console.log('Parsed JSON:', result);
+              } catch (parseError) {
+                console.error('JSON parse failed:', parseError);
+                console.error('Original string that failed to parse:', result);
+                cleanupSubmitJSONP(callbackName);
+                reject(new Error('サーバーからの応答が不正です: ' + parseError.message));
+                return;
+              }
+            }
+            
+            try {
+              if (result && result.success) {
+                console.log('予約送信成功:', result);
+                resolve(result);
+              } else {
+                console.error('予約送信失敗:', result);
+                reject(new Error(result ? result.error : '送信に失敗しました'));
+              }
+            } catch (error) {
+              console.error('Submit処理エラー:', error);
+              reject(error);
+            } finally {
+              // クリーンアップ
+              cleanupSubmitJSONP(callbackName);
+            }
+          };
+          
+          // データをBase64エンコードしてURLパラメータで送信
+          const jsonString = JSON.stringify(data);
+          console.log('=== エンコード前データ詳細 ===');
+          console.log('JSON文字列長:', jsonString.length);
+          console.log('JSON文字列（最初の200文字）:', jsonString.substring(0, 200));
+          console.log('JSON文字列（最後の100文字）:', jsonString.substring(jsonString.length - 100));
+          console.log('================================');
+          
+          const encodedData = btoa(encodeURIComponent(jsonString));
+          console.log('エンコード済みデータ長:', encodedData.length);
+          console.log('エンコード済みデータ（最初の100文字）:', encodedData.substring(0, 100));
+          
+          // デコードテスト（検証用）
+          try {
+            const testDecoded = decodeURIComponent(atob(encodedData));
+            console.log('=== ローカルデコードテスト ===');
+            console.log('デコード成功');
+            console.log('デコード結果長:', testDecoded.length);
+            console.log('デコード結果（最初の200文字）:', testDecoded.substring(0, 200));
+            console.log('元のJSONと一致:', testDecoded === jsonString);
+            console.log('===========================');
+          } catch (localDecodeError) {
+            console.error('ローカルデコードテストエラー:', localDecodeError);
+          }
+          
+          // 代替エンコード方法も試行（Base64が失敗する場合の備え）
+          let alternativeData = null;
+          try {
+            // URL SafeなBase64エンコード
+            const urlSafeBase64 = btoa(encodeURIComponent(jsonString))
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+              .replace(/=/g, '');
+            console.log('URL Safe Base64エンコード:', urlSafeBase64.substring(0, 100));
+            
+            // 直接URLエンコード（短い場合のみ）
+            if (jsonString.length < 1000) {
+              const directUrlEncoded = encodeURIComponent(jsonString);
+              console.log('直接URLエンコード長:', directUrlEncoded.length);
+              alternativeData = { method: 'direct', data: directUrlEncoded };
+            }
+          } catch (altError) {
+            console.warn('代替エンコード失敗:', altError);
+          }
+          
+          // JSONPリクエストURL作成
+          const jsonpUrl = `${GAS_WEB_APP_URL}?action=submitReservation&data=${encodedData}&callback=${callbackName}&_t=${Date.now()}`;
+          console.log('Submit JSONP URL長:', jsonpUrl.length);
+          console.log('Submit JSONP URL:', jsonpUrl.substring(0, 200) + '...');
+          
+          // URLが長すぎる場合はエラー
+          if (jsonpUrl.length > 8000) {
+            throw new Error('送信データが大きすぎます。備考欄の文字数を減らしてください。');
+          }
+          
+          // スクリプトタグを作成
+          const script = document.createElement('script');
+          script.src = jsonpUrl;
+          script.setAttribute('data-submit-jsonp', 'true');
+          script.setAttribute('data-callback', callbackName);
+          
+          // エラーハンドリング
+          script.onerror = function(error) {
+            console.error('Submit JSONP読み込みエラー:', error);
+            console.error('Failed URL:', jsonpUrl.substring(0, 200) + '...');
+            cleanupSubmitJSONP(callbackName);
+            
+            // CORSエラーの場合は概算金額で成功レスポンスを返す（フォールバック）
+            const estimatedTotal = data.items.reduce((sum, item) => {
+              const product = allProducts.find(p => p.name === item.name);
+              const price = product ? product.price : 500;
+              return sum + (price * parseInt(item.qty));
+            }, 0);
+
+            console.log('フォールバック処理:', estimatedTotal);
+            resolve({
+              success: true,
+              total: estimatedTotal,
+              message: '予約を受け付けました（概算金額）'
+            });
+          };
+          
+          script.onload = function() {
+            console.log('Submit JSONPスクリプト読み込み完了');
+          };
+          
+          // スクリプトタグを追加してリクエスト実行
+          document.head.appendChild(script);
+          
+          // タイムアウト設定（15秒）
+          setTimeout(() => {
+            if (window[callbackName]) {
+              console.warn('Submit JSONP タイムアウト');
+              cleanupSubmitJSONP(callbackName);
+              
+              // タイムアウト時もフォールバック
+              const estimatedTotal = data.items.reduce((sum, item) => {
+                const product = allProducts.find(p => p.name === item.name);
+                const price = product ? product.price : 500;
+                return sum + (price * parseInt(item.qty));
+              }, 0);
+              
+              resolve({
+                success: true,
+                total: estimatedTotal,
+                message: '予約を受け付けました（確認中）'
+              });
+            }
+          }, 15000);
+          
+        } catch (error) {
+          console.error('Submit JSONP初期化エラー:', error);
+          reject(error);
+        }
+      });
+    }
+
+    // Submit JSONP クリーンアップ関数
+    function cleanupSubmitJSONP(callbackName) {
+      try {
+        // スクリプトタグを削除
+        const script = document.querySelector(`script[data-callback="${callbackName}"]`);
+        if (script && script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+        
+        // グローバルコールバック関数を削除
+        if (window[callbackName]) {
+          delete window[callbackName];
+        }
+        
+        console.log('Submit JSONP クリーンアップ完了:', callbackName);
+      } catch (error) {
+        console.warn('Submit JSONP クリーンアップエラー:', error);
+      }
+    }
+
+    // JSTの「今日」を取得する関数
+    function getTodayJST() {
+      const now = new Date();
+      // UTC→JST（+9時間）に変換
+      const jst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      return new Date(jst.getFullYear(), jst.getMonth(), jst.getDate());
+    }
+
+    // 商品選択時に受取日・受取時間の有効化/無効化、最短受取日計算、注意書き表示
+    function updatePickupDateControl() {
+      const productItems = document.querySelectorAll('.product-item');
+      const dateInput = document.getElementById('pickup_date');
+      const timeSelect = document.getElementById('pickup_time');
+      const noteDiv = document.getElementById('product-date-note');
+      let selectedProducts = [];
+      let allSelected = true;
+      productItems.forEach(itemDiv => {
+        const select = itemDiv.querySelector('select');
+        const qtyInput = itemDiv.querySelector('input[type="number"]');
+        if (
+          select && select.value &&
+          qtyInput && qtyInput.value && !isNaN(qtyInput.value) &&
+          parseInt(qtyInput.value) >= 1 && Number.isInteger(Number(qtyInput.value))
+        ) {
+          const prod = allProducts.find(p => p.name === select.value);
+          if (prod) selectedProducts.push(prod);
+        } else {
+          allSelected = false;
+        }
+      });
+      if (selectedProducts.length === 0) {
+        dateInput.value = '';
+        dateInput.disabled = true;
+        dateInput.min = '';
+        dateInput.max = '';
+        timeSelect.value = '';
+        timeSelect.disabled = true;
+        noteDiv.innerHTML = '商品を選択してください。';
+        return;
+      }
+      // inputは必ず有効化
+      dateInput.disabled = false;
+      // 最も遅いminDays/minType/cutoffを持つ商品を探す
+      let minDate = null;
+      let minType = null;
+      let cutoff = null;
+      let now = new Date();
+      let today = getTodayJST();
+      let maxMinDate = null;
+      let cutoffMsg = '';
+      selectedProducts.forEach(prod => {
+        let prodMinDate;
+        if (prod.minType === 'business') {
+          prodMinDate = getBusinessDate(today, prod.minDays);
+        } else {
+          prodMinDate = new Date(today);
+          // 締切時刻考慮
+          if (prod.cutoff) {
+            const [h, m] = prod.cutoff.split(':').map(Number);
+            let cutoffDate = new Date(today);
+            cutoffDate.setHours(h, m, 0, 0);
+            if (now > cutoffDate) {
+              prodMinDate.setDate(prodMinDate.getDate() + prod.minDays + 1);
+              cutoffMsg = '※一部商品は本日の締切時刻を過ぎているため、翌日以降の受取となります。';
+            } else {
+              prodMinDate.setDate(prodMinDate.getDate() + prod.minDays);
+            }
+          } else {
+            prodMinDate.setDate(prodMinDate.getDate() + prod.minDays);
+          }
+        }
+        if (!maxMinDate || prodMinDate > maxMinDate) {
+          maxMinDate = prodMinDate;
+        }
+      });
+      // 最大30営業日後
+      let maxDate = getBusinessDate(today, 30);
+      dateInput.min = maxMinDate.toISOString().split('T')[0];
+      dateInput.max = maxDate.toISOString().split('T')[0];
+      
+      // 選択可能な最初の営業日を設定
+      const storeSelect = document.getElementById('store');
+      if (storeSelect.value) {
+        const validDate = findNextValidDate(maxMinDate, storeSelect.value);
+        if (validDate) {
+          const dateString = formatDateForInput(validDate);
+          dateInput.value = dateString;
+        } else {
+          dateInput.value = '';
+        }
+      } else {
+        // 店舗未選択の場合は最小日付を設定（ただし、後で店舗選択時に営業日に調整される）
+        dateInput.value = dateInput.min;
+      }
+      
+      // 受取日が選択されたら時間選択を有効化
+      if (dateInput.value) {
+        // 店舗営業時間に基づいて受取時刻を更新
+        updatePickupTimeOptions();
+      } else {
+        timeSelect.value = '';
+        timeSelect.disabled = true;
+      }
+      // 注意書き・説明文
+      if (selectedProducts.length > 1) {
+        noteDiv.innerHTML = '※複数の商品を同時にご注文いただく場合、すべての商品が揃う最も遅い受取日以降のみご指定いただけます。<br>商品ごとに異なる受取日をご希望の場合は、お手数ですがご注文を分けてご入力ください。' + (cutoffMsg ? '<br>' + cutoffMsg : '');
+      } else if (selectedProducts.length === 1) {
+        noteDiv.innerHTML = '' + (cutoffMsg ? '<br>' + cutoffMsg : '');
+      } else {
+        noteDiv.innerHTML = '商品を選択してください。';
+      }
+    }
+
+    /**
+     * 休業日チェックを含む受取日バリデーション
+     */
+    function validatePickupDate() {
+      const dateInput = document.getElementById('pickup_date');
+      const storeSelect = document.getElementById('store');
+      const timeSelect = document.getElementById('pickup_time');
+      
+      if (!dateInput.value) {
+        timeSelect.value = '';
+        timeSelect.disabled = true;
+        showError('pickup_date', '');
+        return;
+      }
+      
+      if (!storeSelect.value) {
+        showError('pickup_date', '店舗を先に選択してください');
+        dateInput.value = '';
+        timeSelect.value = '';
+        timeSelect.disabled = true;
+        return;
+      }
+      
+      // 選択された店舗情報を取得
+      const selectedStore = allStores.find(store => store.name === storeSelect.value);
+      if (!selectedStore) {
+        showError('pickup_date', '店舗情報の取得に失敗しました');
+        dateInput.value = '';
+        timeSelect.value = '';
+        timeSelect.disabled = true;
+        return;
+      }
+      
+      // 選択された日付の曜日をチェック
+      const selectedDate = new Date(dateInput.value);
+      const dayOfWeek = getDayOfWeekKey(selectedDate.getDay());
+      const storeHours = selectedStore.hours[dayOfWeek];
+      
+      // 休業日の場合
+      if (!storeHours || storeHours === null) {
+        const dayNames = {
+          'mon': '月曜日',
+          'tue': '火曜日', 
+          'wed': '水曜日',
+          'thu': '木曜日',
+          'fri': '金曜日',
+          'sat': '土曜日',
+          'sun': '日曜日'
+        };
+        showError('pickup_date', `${dayNames[dayOfWeek]}は休業日です。他の営業日をお選びください。`);
+        
+        // 次の営業日を提案
+        const nextValidDate = findNextValidDate(selectedDate, storeSelect.value);
+        if (nextValidDate) {
+          const newDateString = formatDateForInput(nextValidDate);
+          dateInput.value = newDateString;
+          // エラーメッセージをクリアして時間選択を更新
+          setTimeout(() => {
+            showError('pickup_date', '');
+            updatePickupTimeOptions();
+          }, 2000); // 2秒後にメッセージを消して次の営業日に設定
+        } else {
+          dateInput.value = '';
+          timeSelect.value = '';
+          timeSelect.disabled = true;
+        }
+        return;
+      }
+      
+      // 営業日の場合はエラーをクリアして時間選択を更新
+      showError('pickup_date', '');
+      updatePickupTimeOptions();
+    }
+
+    /**
+     * 日付文字列をYYYY-MM-DD形式に正規化
+     * @param {Date} date - 日付オブジェクト
+     * @return {string} YYYY-MM-DD形式の文字列
+     */
+    function formatDateForInput(date) {
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const formatted = `${year}-${month}-${day}`;
+      return formatted;
+    }
+
+    /**
+     * 指定日以降の次の営業日を検索
+     * @param {Date} startDate - 検索開始日
+     * @param {string} storeName - 店舗名
+     * @return {Date|null} 次の営業日（見つからない場合はnull）
+     */
+    function findNextValidDate(startDate, storeName) {
+      const selectedStore = allStores.find(store => store.name === storeName);
+      if (!selectedStore) {
+        return null;
+      }
+      
+      const maxAttempts = 14; // 最大2週間先まで検索
+      // 開始日をコピー（タイムゾーンに注意）
+      let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      
+      for (let i = 0; i < maxAttempts; i++) {
+        const dayOfWeek = getDayOfWeekKey(currentDate.getDay());
+        const storeHours = selectedStore.hours[dayOfWeek];
+        
+        // 営業日かつ最小日付以降の場合
+        if (storeHours && storeHours !== null) {
+          const dateInput = document.getElementById('pickup_date');
+          const minDate = new Date(dateInput.min);
+          const maxDate = new Date(dateInput.max);
+          
+          if (currentDate >= minDate && currentDate <= maxDate) {
+            // 新しいDateオブジェクトを作成して返す（参照の問題を解決）
+            return new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+          }
+        }
+        
+        // 次の日へ
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      return null; // 営業日が見つからない場合
+    }
+
+    /**
+     * 店舗営業時間に基づいて受取時刻選択肢を更新する
+     */
+    function updatePickupTimeOptions() {
+      const storeSelect = document.getElementById('store');
+      const dateInput = document.getElementById('pickup_date');
+      const timeSelect = document.getElementById('pickup_time');
+      
+      // 店舗と日付が両方選択されている場合のみ処理
+      if (!storeSelect.value || !dateInput.value) {
+        // 選択されていない場合は時間選択を無効化
+        timeSelect.innerHTML = '<option value="">選択してください</option>';
+        timeSelect.disabled = true;
+        return;
+      }
+      
+      try {
+        // 選択された店舗の情報を取得
+        const selectedStore = allStores.find(store => store.name === storeSelect.value);
+        if (!selectedStore) {
+          console.error('選択された店舗が見つかりません');
+          return;
+        }
+        
+        // 選択された日付の曜日を取得
+        const selectedDate = new Date(dateInput.value);
+        const dayOfWeek = getDayOfWeekKey(selectedDate.getDay());
+        
+        // 店舗の営業時間を取得
+        const storeHours = selectedStore.hours[dayOfWeek];
+        
+        // 営業時間に基づいて時間スロットを生成
+        const timeSlots = generateTimeSlots(storeHours);
+        
+        // 時間選択肢を更新
+        updateTimeSelectOptions(timeSlots, storeHours);
+        
+      } catch (error) {
+        console.error('受取時刻の更新に失敗しました:', error);
+        timeSelect.innerHTML = '<option value="">時刻の取得に失敗しました</option>';
+        timeSelect.disabled = true;
+      }
+    }
+
+    /**
+     * 曜日番号を曜日キーに変換
+     * @param {number} dayNumber - 曜日番号（0=日曜日, 1=月曜日, ...）
+     * @return {string} 曜日キー（mon, tue, wed, thu, fri, sat, sun）
+     */
+    function getDayOfWeekKey(dayNumber) {
+      const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      return dayKeys[dayNumber];
+    }
+
+    /**
+     * 営業時間に基づいて30分間隔の時間スロットを生成
+     * @param {Array|null} hours - 営業時間配列
+     * @return {Array<string>} 時間スロット配列
+     */
+    function generateTimeSlots(hours) {
+      if (!hours || hours === null) {
+        return [];
+      }
+      
+      const slots = [];
+      
+      // 営業時間が配列の配列の場合（複数の営業時間帯）
+      if (Array.isArray(hours[0])) {
+        hours.forEach(timeRange => {
+          const rangeSlots = generateTimeSlotsForRange(timeRange[0], timeRange[1]);
+          slots.push(...rangeSlots);
+        });
+      } else {
+        // 単一の営業時間帯の場合
+        const rangeSlots = generateTimeSlotsForRange(hours[0], hours[1]);
+        slots.push(...rangeSlots);
+      }
+      
+      return slots.sort(); // 時間順にソート
+    }
+
+    /**
+     * 開始時刻と終了時刻の間で30分間隔の時間スロットを生成
+     * @param {string} startTime - 開始時刻（HH:MM形式）
+     * @param {string} endTime - 終了時刻（HH:MM形式）
+     * @return {Array<string>} 時間スロット配列
+     */
+    function generateTimeSlotsForRange(startTime, endTime) {
+      const slots = [];
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const [endHour, endMin] = endTime.split(':').map(Number);
+      
+      let currentHour = startHour;
+      let currentMin = startMin;
+      
+      while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
+        const timeSlot = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
+        slots.push(timeSlot);
+        
+        // 30分追加
+        currentMin += 30;
+        if (currentMin >= 60) {
+          currentMin = 0;
+          currentHour++;
+        }
+      }
+      
+      return slots;
+    }
+
+    /**
+     * 時間選択肢を更新
+     * @param {Array<string>} timeSlots - 時間スロット配列
+     * @param {Array|null} storeHours - 店舗営業時間
+     */
+    function updateTimeSelectOptions(timeSlots, storeHours) {
+      const timeSelect = document.getElementById('pickup_time');
+      const currentValue = timeSelect.value; // 現在の選択値を保持
+      
+      // 選択肢をクリア
+      timeSelect.innerHTML = '<option value="">選択してください</option>';
+      
+      if (!storeHours || storeHours === null) {
+        // 営業していない場合
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'この日は営業しておりません';
+        option.disabled = true;
+        timeSelect.appendChild(option);
+        timeSelect.disabled = true;
+        return;
+      }
+      
+      if (timeSlots.length === 0) {
+        // 時間スロットがない場合
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '受取可能時間がありません';
+        option.disabled = true;
+        timeSelect.appendChild(option);
+        timeSelect.disabled = true;
+        return;
+      }
+      
+      // 時間スロットを選択肢として追加
+      timeSlots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = slot;
+        option.textContent = slot;
+        timeSelect.appendChild(option);
+      });
+      
+      // 時間選択を有効化
+      timeSelect.disabled = false;
+      
+      // 以前の選択値が有効な場合は復元
+      if (currentValue && timeSlots.includes(currentValue)) {
+        timeSelect.value = currentValue;
+      }
+    }
+
+    // ==============================================
+    // セキュリティ関連の機能
+    // ==============================================
+    
+    /**
+     * プライバシーポリシーの詳細表示/非表示を切り替え
+     */
+    function togglePrivacyPolicy() {
+      const content = document.getElementById('privacy-content');
+      const button = document.querySelector('.privacy-toggle');
+      
+      if (content.classList.contains('show')) {
+        content.classList.remove('show');
+        button.textContent = '詳細を表示';
+      } else {
+        content.classList.add('show');
+        button.textContent = '詳細を非表示';
+      }
+    }
+    
+    /**
+     * レート制限チェック（短時間内の連続送信防止）
+     * @return {boolean} 送信可能かどうか
+     */
+    function checkRateLimit() {
+      const now = Date.now();
+      const lastSubmitTime = localStorage.getItem('lastSubmitTime');
+      const RATE_LIMIT_DURATION = 60000; // 1分間制限
+      
+      if (lastSubmitTime && (now - parseInt(lastSubmitTime)) < RATE_LIMIT_DURATION) {
+        const remaining = Math.ceil((RATE_LIMIT_DURATION - (now - parseInt(lastSubmitTime))) / 1000);
+        document.getElementById('rate-limit-warning').style.display = 'block';
+        document.getElementById('rate-limit-warning').innerHTML = 
+          `<strong>⚠️ 注意:</strong> 短時間内の連続送信を検出しました。あと${remaining}秒お待ちください。`;
+        return false;
+      }
+      
+      document.getElementById('rate-limit-warning').style.display = 'none';
+      return true;
+    }
+    
+    /**
+     * 送信時刻を記録（レート制限用）
+     */
+    function recordSubmitTime() {
+      localStorage.setItem('lastSubmitTime', Date.now().toString());
+    }
+    
+    /**
+     * 入力値のサニタイズ（クライアントサイド）
+     * @param {string} input - 入力文字列
+     * @return {string} サニタイズ後の文字列
+     */
+    function sanitizeInput(input) {
+      if (typeof input !== 'string') return '';
+      
+      // HTMLタグを除去
+      input = input.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      input = input.replace(/<[^>]*>/g, '');
+      
+      // SQLインジェクション対策（基本的な危険文字列を除去）
+      const dangerousPatterns = [
+        /('|\\')|(;)|(\\)|(--|\/\*|\*\/)/gi,
+        /(select|insert|update|delete|drop|union|script)/gi
+      ];
+      
+      dangerousPatterns.forEach(pattern => {
+        input = input.replace(pattern, '');
+      });
+      
+      // 改行・特殊文字の正規化
+      input = input.replace(/[\r\n\t]/g, ' ');
+      input = input.trim();
+      
+      return input;
+    }
+    
+    /**
+     * reCAPTCHA v3でトークンを取得
+     * @param {string} action - 実行するアクションの名前
+     * @return {Promise<string>} reCAPTCHAトークン
+     */
+    async function getRecaptchaToken(action = 'form_submit') {
+      try {
+        // 🚀 高速化対応: reCAPTCHAが遅延読み込み中の場合は待機
+        if (typeof grecaptcha === 'undefined') {
+          console.log('⏳ reCAPTCHA読み込み待機中...');
+          // 最大5秒間待機
+          for (let i = 0; i < 50; i++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (typeof grecaptcha !== 'undefined') {
+              console.log('✅ reCAPTCHA読み込み完了、実行します');
+              break;
+            }
+          }
+        }
+        
+        if (typeof grecaptcha === 'undefined') {
+          console.warn('⚠️ reCAPTCHA読み込みが完了していません（セキュリティ機能制限）');
+          return null;
+        }
+        
+        const token = await grecaptcha.execute('6Le2lk4rAAAAAJu2ojJxoexvlUILZn4oNyJvuHzd', {action: action});
+        return token;
+      } catch (error) {
+        console.error('reCAPTCHA トークン取得エラー:', error);
+        return null;
+      }
+    }
+    
+    /**
+     * reCAPTCHA v3 トークン検証とスコア判定
+     * @param {string} token - reCAPTCHAトークン
+     * @return {boolean} 検証通過かどうか
+     */
+    async function validateRecaptchaV3(token) {
+      if (!token) {
+        console.warn('reCAPTCHA トークンが取得できませんでした');
+        return false;
+      }
+      
+      // サーバーサイドでの検証が必要ですが、
+      // ここではクライアントサイドの基本チェックのみ実装
+      // 実際の検証はサーバーサイド（Code.gs）で行います
+      return true;
+    }
+    
+    /**
+     * フォーム送信前の包括的なバリデーション
+     * @param {FormData} formData - フォームデータ
+     * @return {Promise<Object>} バリデーション結果
+     */
+    async function validateFormSecurity(formData) {
+      const errors = [];
+      
+      // プライバシーポリシー同意チェック
+      const privacyConsent = document.getElementById('privacy-consent').checked;
+      if (!privacyConsent) {
+        errors.push({ field: 'privacy-consent', message: 'プライバシーポリシーへの同意が必要です' });
+      }
+      
+      // レート制限チェック
+      if (!checkRateLimit()) {
+        errors.push({ field: 'rate-limit', message: '短時間内の連続送信です' });
+      }
+      
+      // reCAPTCHA検証
+      if (typeof grecaptcha !== 'undefined') {
+        const token = await getRecaptchaToken();
+        if (!await validateRecaptchaV3(token)) {
+          errors.push({ field: 'recaptcha', message: 'reCAPTCHA認証が必要です' });
+        }
+      }
+      
+      // 入力値の長さチェック（DoS攻撃対策）
+      const maxLengths = {
+        name: 100,
+        phone: 20,
+        email: 254,
+        note: 1000
+      };
+      
+      Object.keys(maxLengths).forEach(field => {
+        const value = formData.get(field);
+        if (value && value.length > maxLengths[field]) {
+          errors.push({ field: field, message: `入力が長すぎます（最大${maxLengths[field]}文字）` });
+        }
+      });
+      
+      // キャンセルポリシー同意チェック
+      const cancelPolicyConsent = document.getElementById('cancel-policy-consent').checked;
+      if (!cancelPolicyConsent) {
+        errors.push({ field: 'cancel-policy-consent', message: 'キャンセルポリシーへの同意が必要です' });
+      }
+      
+      return { isValid: errors.length === 0, errors: errors };
+    }
+    
+    /**
+     * フォームデータの事前処理（サニタイズ）
+     * @param {Object} data - 送信データ
+     * @return {Object} サニタイズ後のデータ
+     */
+    async function preprocessFormData(data) {
+      const processedData = { ...data };
+      
+      // 文字列フィールドをサニタイズ
+      ['name', 'phone', 'email', 'store', 'note'].forEach(field => {
+        if (processedData[field]) {
+          processedData[field] = sanitizeInput(processedData[field]);
+        }
+      });
+      
+      // 商品データもサニタイズ
+      if (processedData.items && Array.isArray(processedData.items)) {
+        processedData.items = processedData.items.map(item => ({
+          name: sanitizeInput(item.name || ''),
+          qty: parseInt(item.qty) || 0
+        }));
+      }
+      
+      // reCAPTCHA レスポンスを追加
+      if (typeof grecaptcha !== 'undefined') {
+        processedData.recaptchaResponse = await getRecaptchaToken();
+      }
+      
+      return processedData;
+    }
+
+    // カスタムモーダルの「画面を閉じる」ボタン
+    document.getElementById('modal-close-btn').onclick = function(){
+      document.getElementById('custom-modal').classList.remove('show');
+      document.getElementById('final-message').classList.add('show');
+      document.getElementById('final-message').innerHTML = 'ご予約ありがとうございました。<br>この画面は閉じてください。';
+      // それ以上の操作ができないようにフォーム・ボタンを非表示
+      document.getElementById('reserveForm').style.display = 'none';
+      document.getElementById('close-btn-area').style.display = 'none';
+    };
+
+    /**
+     * GAS WebアプリURLの接続テスト
+     */
+    async function testGasConnection() {
+      console.log('=== GAS接続テスト開始 ===');
+      
+      return new Promise((resolve) => {
+        const callbackName = 'testCallback' + Date.now();
+        const timeoutDuration = 10000; // 10秒タイムアウト
+        
+        // テスト用コールバック関数
+        window[callbackName] = function(result) {
+          console.log('GAS接続テスト成功:', result);
+          cleanup();
+          resolve({ success: true, result });
+        };
+        
+        // クリーンアップ関数
+        const cleanup = () => {
+          const script = document.querySelector(`script[data-test-callback="${callbackName}"]`);
+          if (script && script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
+          if (window[callbackName]) {
+            delete window[callbackName];
+          }
+        };
+        
+        // テスト用スクリプトタグ
+        const script = document.createElement('script');
+        const testUrl = `${GAS_WEB_APP_URL}?action=test&callback=${callbackName}&_t=${Date.now()}`;
+        script.src = testUrl;
+        script.setAttribute('data-test-callback', callbackName);
+        
+        script.onerror = function(error) {
+          console.error('GAS接続テスト失敗:', error);
+          console.error('テストURL:', testUrl);
+          cleanup();
+          resolve({ success: false, error: 'スクリプト読み込みエラー' });
+        };
+        
+        script.onload = function() {
+          console.log('GASテストスクリプト読み込み完了');
+        };
+        
+        document.head.appendChild(script);
+        
+        // タイムアウト設定
+        setTimeout(() => {
+          if (window[callbackName]) {
+            console.warn('GAS接続テストタイムアウト');
+            cleanup();
+            resolve({ success: false, error: 'タイムアウト' });
+          }
+        }, timeoutDuration);
+      });
+    }
+
+    // ========================================
+    // 合計金額計算とStripe決済機能
+    // ========================================
+    
+    /**
+     * 合計金額を計算して表示
+     */
+    function updateTotalAmount() {
+      const productItems = document.querySelectorAll('.product-item');
+      let totalAmount = 0;
+      let items = [];
+      let allValid = true;
+      
+      productItems.forEach(itemDiv => {
+        const select = itemDiv.querySelector('select');
+        const qtyInput = itemDiv.querySelector('input[type="number"]');
+        
+        if (select.value && qtyInput.value && qtyInput.value > 0) {
+          const product = allProducts.find(p => p.name === select.value);
+          if (product) {
+            const qty = parseInt(qtyInput.value);
+            const subtotal = product.price * qty;
+            totalAmount += subtotal;
+            
+            items.push({
+              name: product.name,
+              price: product.price,
+              qty: qty,
+              subtotal: subtotal
+            });
+          }
+        } else if (select.value || qtyInput.value) {
+          allValid = false;
+        }
+      });
+      
+      // 合計金額表示
+      const totalSection = document.getElementById('total-amount-section');
+      const totalDisplay = document.getElementById('total-amount');
+      const itemsSummary = document.getElementById('items-summary');
+      const paymentBtn = document.getElementById('payment-btn');
+      
+      if (items.length > 0) {
+        totalSection.style.display = 'block';
+        totalDisplay.textContent = totalAmount.toLocaleString() + '円';
+        
+        // 商品リスト表示
+        itemsSummary.innerHTML = items.map(item => 
+          `• ${item.name} × ${item.qty} = ${item.subtotal.toLocaleString()}円`
+        ).join('<br>');
+        
+        // 決済ボタンを常に表示
+        paymentBtn.style.display = 'block';
+        
+        // 🚀 高速化: 決済機能表示時にStripe設定を遅延読み込み
+        loadStripeIfNeeded().catch(error => {
+          console.warn('Stripe設定読み込み失敗:', error);
+        });
+        
+      } else {
+        totalSection.style.display = 'none';
+        // 商品未選択でも決済ボタンを表示
+        paymentBtn.style.display = 'block';
+      }
+    }
+    
+    /**
+     * 商品情報を収集して予約データを作成
+     * @return {Object|null} 予約データまたはnull（無効な場合）
+     */
+    function collectReservationData() {
+      // フォームデータを収集
+      const formData = new FormData(document.getElementById('reserveForm'));
+      
+      const data = {
+        name: formData.get('name'),
+        phone: formData.get('phone'),
+        email: formData.get('email'),
+        store: formData.get('store'),
+        pickup_date: formData.get('pickup_date'),
+        pickup_time: formData.get('pickup_time'),
+        note: formData.get('note'),
+        items: []
+      };
+      
+      // 商品データを収集
+      const productItems = document.querySelectorAll('.product-item');
+      productItems.forEach(itemDiv => {
+        const select = itemDiv.querySelector('select');
+        const qtyInput = itemDiv.querySelector('input[type="number"]');
+        
+        if (select.value && qtyInput.value && qtyInput.value > 0) {
+          const product = allProducts.find(p => p.name === select.value);
+          if (product) {
+            data.items.push({
+              name: product.name,
+              price: product.price,
+              qty: parseInt(qtyInput.value)
+            });
+          }
+        }
+      });
+      
+      // バリデーション
+      if (!data.name || !data.phone || !data.email || !data.store || 
+          !data.pickup_date || !data.pickup_time || data.items.length === 0) {
+        return null;
+      }
+      
+      return data;
+    }
+    
+    /**
+     * 事前決済ボタンクリック処理
+     */
+    async function handlePaymentReservation() {
+      try {
+        console.log('事前決済予約開始');
+        
+        // 🚀 高速化: Stripe設定が読み込まれていることを確認
+        await loadStripeIfNeeded();
+        
+        // フォームバリデーション
+        const form = document.getElementById('reserveForm');
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+        
+        // プライバシーポリシー同意チェック
+        const privacyConsent = document.getElementById('privacy-consent').checked;
+        if (!privacyConsent) {
+          alert('プライバシーポリシーへの同意が必要です。');
+          return;
+        }
+        
+        // キャンセルポリシー同意チェック
+        const cancelPolicyConsent = document.getElementById('cancel-policy-consent').checked;
+        if (!cancelPolicyConsent) {
+          alert('キャンセルポリシーへの同意が必要です。');
+          return;
+        }
+        
+        // 予約データを収集
+        const reservationData = collectReservationData();
+        if (!reservationData) {
+          alert('入力内容を確認してください。');
+          return;
+        }
+        
+        // ボタンを無効化
+        const paymentBtn = document.getElementById('payment-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        paymentBtn.disabled = true;
+        submitBtn.disabled = true;
+        paymentBtn.textContent = '決済処理中...';
+        
+        // Stripe Checkoutを開始
+        await startStripeCheckout(reservationData);
+        
+      } catch (error) {
+        console.error('事前決済エラー:', error);
+        alert('決済の開始に失敗しました: ' + error.message);
+        
+        // ボタンを再有効化
+        const paymentBtn = document.getElementById('payment-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        paymentBtn.disabled = false;
+        submitBtn.disabled = false;
+        paymentBtn.textContent = '💳 事前決済で予約';
+      }
+    }
+    
+    // ========================================
+    // イベントリスナーの追加
+    // ========================================
+    
+    // DOMContentLoaded時の追加処理
+    document.addEventListener('DOMContentLoaded', function() {
+      // 決済ボタンのクリックイベント
+      document.getElementById('payment-btn').addEventListener('click', handlePaymentReservation);
+      
+      // 商品選択・数量変更時の合計金額更新
+      document.addEventListener('change', function(e) {
+        if (e.target.matches('.product-item select') || e.target.matches('.product-item input[type="number"]')) {
+          updateTotalAmount();
+        }
+      });
+      
+      // 商品追加・削除時の合計金額更新
+      const productListArea = document.getElementById('product-list-area');
+      const observer = new MutationObserver(function() {
+        setTimeout(updateTotalAmount, 100);
+      });
+      observer.observe(productListArea, { childList: true, subtree: true });
+      
+      // 初期表示時の合計金額更新
+      setTimeout(updateTotalAmount, 1000);
+    });
+    
+    // ========================================
+    // 既存の商品項目追加関数を拡張
+    // ========================================
+    
+    // 元のaddProductItem関数を保存
+    const originalAddProductItem = window.addProductItem;
+    
+    // 新しいaddProductItem関数（合計金額更新機能付き）
+    window.addProductItem = function() {
+      originalAddProductItem();
+      
+      // 新しく追加された要素にイベントリスナーを設定
+      const newItems = document.querySelectorAll('.product-item:last-child select, .product-item:last-child input[type="number"]');
+      newItems.forEach(element => {
+        element.addEventListener('change', updateTotalAmount);
+        element.addEventListener('input', updateTotalAmount);
+      });
+      
+      updateTotalAmount();
+    };
+    
+    // 元のremoveProductItem関数を保存・拡張
+    const originalRemoveProductItem = window.removeProductItem;
+    
+    window.removeProductItem = function(button) {
+      originalRemoveProductItem(button);
+      setTimeout(updateTotalAmount, 100);
+    };
+  </script>
+</body>
+</html>

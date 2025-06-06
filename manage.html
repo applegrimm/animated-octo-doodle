@@ -1,0 +1,119 @@
+<!--
+  @file manage.html
+  @brief 店舗管理画面 - テイクアウト予約管理システム（Phase 2最終高速化版）
+  @details GAS通信高速化：キャッシュ、並列処理、差分更新実装版
+  @version 2.0 - Phase 2: GAS通信完全高速化
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店舗管理画面 - テイクアウト予約管理 (Phase 2)</title>
+  
+  <!-- 外部CSS読み込み（高速化） -->
+  <link rel="stylesheet" href="manage_styles.css">
+  
+  <!-- プリロード（さらなる高速化） -->
+  <link rel="preload" href="manage_scripts_phase2.js" as="script">
+  
+  <!-- DNS プリフェッチ（GAS通信高速化） -->
+  <link rel="dns-prefetch" href="//script.google.com">
+</head>
+<body>
+  <!-- 認証エラー表示エリア -->
+  <div id="auth-error" class="auth-error" style="display: none;">
+    <h2>🔒 アクセス権限エラー</h2>
+    <p>このページにアクセスする権限がありません。</p>
+    <p>正しい管理画面URLからアクセスしてください。</p>
+  </div>
+
+  <!-- メイン画面 -->
+  <div id="main-content" style="display: none;">
+    <div class="header">
+      <h1 id="store-name">店舗管理画面</h1>
+      <div class="subtitle">本日以降の予約一覧</div>
+    </div>
+    
+    <!-- 統計情報 -->
+    <div class="stats" id="stats">
+      <div class="stat-card">
+        <div class="stat-number" id="total-count">0</div>
+        <div class="stat-label">総予約数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="pending-count">0</div>
+        <div class="stat-label">未完了</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="completed-count">0</div>
+        <div class="stat-label">完了済み</div>
+      </div>
+    </div>
+    
+    <!-- 本日分未完了警告メッセージ -->
+    <div id="today-warning" class="today-warning" style="display: none;">
+      <h3>🚨 本日分の予約に未受渡しがあります</h3>
+      <p>本日のお客様をお待たせしないよう、受渡し完了の確認をお願いします</p>
+    </div>
+    
+    <!-- コントロールボタン -->
+    <div class="controls">
+      <button class="btn refresh" onclick="loadReservations()">
+        🔄 更新
+      </button>
+      <button class="btn" id="filter-today" onclick="filterReservations('today')">
+        📅 本日分のみ
+      </button>
+      <button class="btn" id="filter-all" onclick="filterReservations('all')">
+        📋 全て表示
+      </button>
+      <button class="btn" id="filter-pending" onclick="filterReservations('pending')">
+        ⏳ 未完了のみ
+      </button>
+      <button class="btn" id="filter-completed" onclick="filterReservations('completed')">
+        ✅ 完了済みのみ
+      </button>
+      <button class="btn" id="filter-past7days" onclick="loadPast7Days()">
+        📈 過去7日間
+      </button>
+    </div>
+    
+    <!-- エラーメッセージ -->
+    <div id="error-message" class="error" style="display: none;">
+      <span>⚠️</span>
+      <span id="error-text"></span>
+    </div>
+    
+    <!-- ローディング -->
+    <div id="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <div>予約データを読み込み中...</div>
+    </div>
+    
+    <!-- 予約一覧 -->
+    <div id="reservation-list" class="reservation-list" style="display: none;"></div>
+    
+    <!-- データなし -->
+    <div id="no-data" class="no-data" style="display: none;">
+      <h3>📋 予約データがありません</h3>
+      <p>本日以降の予約はまだありません。</p>
+    </div>
+  </div>
+
+  <!-- 担当者名入力モーダル -->
+  <div id="staff-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>👤 受渡し担当者名を入力してください</h3>
+      <input type="text" id="staff-name-input" class="modal-input" placeholder="担当者名を入力..." maxlength="50" required>
+      <div class="modal-buttons">
+        <button class="modal-btn confirm" onclick="confirmStaffInput()">✓ 確定</button>
+        <button class="modal-btn cancel" onclick="cancelStaffInput()">✗ キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2: 高速化JavaScript読み込み -->
+  <script src="manage_scripts_phase2.js"></script>
+</body>
+</html> 
